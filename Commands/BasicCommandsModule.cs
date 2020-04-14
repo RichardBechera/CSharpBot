@@ -3,7 +3,10 @@ using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using DSharpPlus.Interactivity;
 using System;
+using System.Diagnostics.Tracing;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
 
@@ -19,10 +22,7 @@ namespace csharpbot.Commands
         [Description("Simple command to test if the bot is running!")]
         public async Task Alive(CommandContext ctx)
         {
-            /* Trigger the Typing... in discord */
             await ctx.TriggerTypingAsync();
-
-            /* Send the message "I'm Alive!" to the channel the message was recieved from */
             await ctx.RespondAsync("I'm alive!");
         }
         
@@ -38,17 +38,14 @@ namespace csharpbot.Commands
                 c => c.Author.Id == ctx.Message.Author.Id, // Make sure the response is from the same person who sent the command
                 TimeSpan.FromSeconds(60) // Wait 60 seconds for a response instead of the default 30 we set earlier!
             );
-            // You can also check for a specific message by doing something like
-            // c => c.Content == "something"
-
-            // Null if the user didn't respond before the timeout
+            
             if(reminderContent == null)
             {
                 await ctx.RespondAsync("Sorry, I didn't get a response!");
                 return;
             }
             
-            // Homework: have this change depending on if they say "good" or "bad", etc.
+            
             var good_words = new string[] {"good", "great", "awesome", "well", "dobre", "vyborne", "skvelo"};
             var bad_words = new string[] {"bad", "horrible", "terrible", "better", "zle", "hrozne", "otrasne"};
 
@@ -76,5 +73,51 @@ namespace csharpbot.Commands
             }
             
         }
+
+        
+        //! sending embed message doesnt work
+        [Command("poll")]
+        [Description("Creates simple poll, params: time and options")]
+        public async Task Poll(CommandContext ctx, string time, params string[] options)
+        {
+            
+            var interaction = ctx.Client.GetInteractivityModule();
+            var duration = TimeSpan.FromMinutes(double.Parse(time));
+            await ctx.TriggerTypingAsync();
+            var optionReactions = new[] {DiscordEmoji.FromName(ctx.Client, ":one:"), 
+                DiscordEmoji.FromName(ctx.Client, ":two:"), 
+                DiscordEmoji.FromName(ctx.Client, ":three:"), 
+                DiscordEmoji.FromName(ctx.Client, ":four:"), 
+                DiscordEmoji.FromName(ctx.Client, ":five:")
+            };
+            var printer = "";
+            for (var j = 0; j < optionReactions.Length; j++)
+            {
+                printer += $"\n{optionReactions[j].Name} {options[j]}";
+            }
+            //TODO
+            /*var embed = new DiscordEmbedBuilder
+            {
+                Title = "Poll",
+                Color = DiscordColor.Blurple,
+                ThumbnailUrl = ctx.Client.GatewayUrl,
+                Description = printer
+            }.Build();
+            */
+            var pollMessage = await ctx.Channel.SendMessageAsync(printer + "\nVoting starts in 5 seconds, please wait.");
+            foreach (var t in optionReactions)
+            {
+                await pollMessage.CreateReactionAsync(t).ConfigureAwait(false);
+            }
+
+            Thread.Sleep(5000);
+            var result = await interaction.CollectReactionsAsync(pollMessage, duration).ConfigureAwait(false);
+            var results = result.Reactions;
+
+            var printableResults = results.Aggregate("", (rest, emoji) => rest + $"\n{emoji.Key}: {emoji.Value}");
+            await ctx.RespondAsync(printableResults).ConfigureAwait(false);
+            
+        }
+        
     }
 }

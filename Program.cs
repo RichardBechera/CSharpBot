@@ -56,13 +56,16 @@ namespace csharpbot
                     PaginationTimeout = TimeSpan.FromSeconds(30), // How long to wait before timing out
                     Timeout = TimeSpan.FromSeconds(30) // Default time to wait for interactive commands like waiting for a message or a reaction
                 });
+                
 
                 // Build dependancies and then create the commands module.
                 var deps = BuildDeps();
                 _commands = _discord.UseCommandsNext(new CommandsNextConfiguration
                 {
                     StringPrefix = _config.GetValue<string>("discord:CommandPrefix"), // Load the command prefix(what comes before the command, eg "!" or "/") from our config file
-                    Dependencies = deps // Pass the dependancies
+                    Dependencies = deps, // Pass the dependancies
+                    EnableMentionPrefix = true,
+                    EnableDms = false
                 });
 
                 Console.WriteLine("[info] Loading command modules..");
@@ -83,10 +86,7 @@ namespace csharpbot
             
             catch(Exception ex)
             {
-                // This will catch any exceptions that occur during the operation/setup of your bot.
-
-                // Feel free to replace this with what ever logging solution you'd like to use.
-                // I may do a guide later on the basic logger I implemented in my most recent bot.
+                // if wasnt succesfull
                 Console.Error.WriteLine(ex.ToString());
             }
         }
