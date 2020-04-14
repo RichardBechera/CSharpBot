@@ -6,6 +6,7 @@ using System;
 using System.Diagnostics.Tracing;
 using System.Linq;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
@@ -78,11 +79,11 @@ namespace csharpbot.Commands
         //! sending embed message doesnt work
         [Command("poll")]
         [Description("Creates simple poll, params: time and options")]
-        public async Task Poll(CommandContext ctx, string time, params string[] options)
+        public async Task Poll(CommandContext ctx, TimeSpan time, params string[] options)
         {
             
             var interaction = ctx.Client.GetInteractivityModule();
-            var duration = TimeSpan.FromMinutes(double.Parse(time));
+            //var duration = TimeSpan.FromMinutes(double.Parse(time));
             await ctx.TriggerTypingAsync();
             var optionReactions = new[] {DiscordEmoji.FromName(ctx.Client, ":one:"), 
                 DiscordEmoji.FromName(ctx.Client, ":two:"), 
@@ -111,7 +112,7 @@ namespace csharpbot.Commands
             }
 
             Thread.Sleep(5000);
-            var result = await interaction.CollectReactionsAsync(pollMessage, duration).ConfigureAwait(false);
+            var result = await interaction.CollectReactionsAsync(pollMessage, time).ConfigureAwait(false);
             var results = result.Reactions;
 
             var printableResults = results.Aggregate("", (rest, emoji) => rest + $"\n{emoji.Key}: {emoji.Value}");
