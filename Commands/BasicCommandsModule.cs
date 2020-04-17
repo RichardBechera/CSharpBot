@@ -3,20 +3,16 @@ using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using DSharpPlus.Interactivity;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Diagnostics.Tracing;
+using System.ComponentModel.DataAnnotations;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Reflection;
-using System.Runtime.InteropServices;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
 using Newtonsoft.Json;
-using System.Net.Http;
 
 namespace csharpbot.Commands
 {
@@ -125,6 +121,57 @@ namespace csharpbot.Commands
             var printableResults = results.Aggregate("", (rest, emoji) => rest + $"\n{emoji.Key}: {emoji.Value}");
             await ctx.RespondAsync(printableResults).ConfigureAwait(false);
             
+        }
+
+        [Command("emotevote")]
+        [Description("Voting which emote should remain")]
+        public async Task Emotevote(CommandContext ctx, string old, string newemote, string name)
+        {
+            var webClient = new WebClient();
+            Stream imageBytes;
+            /*try
+            {
+                imageBytes = webClient.OpenRead(newemote);
+            }
+            catch (WebException e)
+            {
+                ctx.RespondAsync("wrong uri");
+                return;
+            }*/
+            var interaction = ctx.Client.GetInteractivityModule();
+            var time = new TimeSpan(0, 0, 0, 59);
+
+            var optionReactions = new[] {DiscordEmoji.FromName(ctx.Client, ":thumbsup:"), 
+                DiscordEmoji.FromName(ctx.Client, ":thumbsdown:")
+            };
+            var pollMessage = await ctx.Channel.SendMessageAsync( $"{old} => {newemote}\nVoting starts in 5 seconds, please wait.");
+            foreach (var t in optionReactions)
+            {
+                await pollMessage.CreateReactionAsync(t).ConfigureAwait(false);
+            }
+            Thread.Sleep(5000);
+            var resultReactions = await interaction.CollectReactionsAsync(pollMessage, time).ConfigureAwait(false);
+            var resultType = resultReactions.Reactions
+                .Where(a => a.Key.Equals(optionReactions[0]) || a.Key.Equals(optionReactions[1]))
+                .Select(a => new {emoji = a.Key.Equals(optionReactions[0]), count = a.Value})
+                .OrderBy(a=> a.count);
+            var isMore = false;
+            var isRatio = true;
+            if (resultType.Any())
+                isMore = resultType.First().emoji;
+            if (resultType.Count() == 2)
+                isRatio = resultType.First().count / resultType.Last().count > 9 / 6.0;
+
+            var result = isMore && isRatio;
+            await ctx.RespondAsync(result ? "The change will come" : "People disagreed");
+            //! delete and add doesn't work properly
+            var emoji = ctx.Guild.GetEmojisAsync().Result.First(a => a.GetDiscordName().Equals(old.Trim()));
+            await ctx.RespondAsync(emoji.GetDiscordName());
+            await ctx.Guild.DeleteEmojiAsync(emoji);
+            await ctx.RespondAsync(emoji.GetDiscordName());
+            await ctx.Guild.CreateEmojiAsync(name, webClient.OpenRead(newemote));
+            await ctx.RespondAsync(emoji.Name);
+
         }
 
         [Command("memes_t")]
