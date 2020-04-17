@@ -3,13 +3,20 @@ using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using DSharpPlus.Interactivity;
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Diagnostics.Tracing;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
+using Newtonsoft.Json;
+using System.Net.Http;
 
 namespace csharpbot.Commands
 {
@@ -49,7 +56,7 @@ namespace csharpbot.Commands
             
             var good_words = new string[] {"good", "great", "awesome", "well", "dobre", "vyborne", "skvelo"};
             var bad_words = new string[] {"bad", "horrible", "terrible", "better", "zle", "hrozne", "otrasne"};
-
+           
             if (good_words.Any(word => reminderContent.Message.Content.Contains(word)))
             {
                 if (reminderContent.Message.Content.Contains("not"))
@@ -119,6 +126,91 @@ namespace csharpbot.Commands
             await ctx.RespondAsync(printableResults).ConfigureAwait(false);
             
         }
+
+        [Command("memes_t")]
+        [Description("Sends random meme")]
+        public async Task MemesT(CommandContext ctx)
+        {
+            var client = new WebClient();
+            var content = client.DownloadString("https://api.imgflip.com/get_memes");
+            dynamic stuff = JsonConvert.DeserializeObject(content);
+            if (stuff == null) return;
+            var memes = stuff.data.memes;
+            var templates = "";
+            for (int i = 0; i < 100; i++)
+            {
+                templates += $"{memes[i].name}: {memes[i].id}\n";
+                if (i % 10 != 9) continue;
+                await ctx.Channel.SendMessageAsync(embed: new DiscordEmbedBuilder
+                {
+                    Description = templates
+                });
+                templates = "";
+            }
+        }
+        
+        [Command("memes_s")]
+        [Description("Sends random meme")]
+        public async Task MemesS(CommandContext ctx, string id)
+        {
+            var client = new WebClient();
+            var content = client.DownloadString("https://api.imgflip.com/get_memes");
+            dynamic stuff = JsonConvert.DeserializeObject(content);
+            if (stuff == null) return;
+            var memes = stuff.data.memes;
+            
+            var template = "";
+            for (var i = 0; i < 100; i++)
+                if (memes[i].id == id)
+                {
+                    template = memes[i].url;
+                    break;
+                }
+
+            
+            //var index = new Random().Next(0, 99);
+            //var name = memes[index].name;
+            //var imageUrl = memes[index].url;
+            
+            await ctx.Channel.SendMessageAsync(embed: new DiscordEmbedBuilder
+            {
+                ImageUrl = template
+            });
+        }
+        
+        [Command("memes_c")]
+        [Description("Sends random meme with custom caption, separate text with |")]
+        public async Task MemesC(CommandContext ctx, string id, [RemainingText] string caption)
+        {
+            var client = new WebClient();
+            var captions = caption.Split('|', 2);
+            var content = client.DownloadString("https://api.imgflip.com/get_memes");
+            dynamic stuff = JsonConvert.DeserializeObject(content);
+            if (stuff == null) return;
+            var memes = stuff.data.memes;
+
+            var imageResult = AddCaption(captions[0], captions[1], id);
+            await ctx.RespondAsync(await imageResult);
+        }
+
+        private async Task<string> AddCaption(string caption1, string caption2, string template)
+        {
+            var client = new HttpClient();
+            var values =  new Dictionary<string, string>{
+                {"template_id", template},
+                {"username", "richardBechera"},
+                {"password", "nExv.cH9.KZvH#9"},
+                {"text0", caption1},
+                {"text1", caption2}
+            };
+
+            var content = new FormUrlEncodedContent(values);
+            var response = await client.PostAsync("https://api.imgflip.com/caption_image", content);
+            var stuff = response.Content;
+            var jsonContent = stuff.ReadAsStringAsync().Result;
+            dynamic url = JsonConvert.DeserializeObject(jsonContent);
+            return url.data.url;
+        } 
         
     }
 }
