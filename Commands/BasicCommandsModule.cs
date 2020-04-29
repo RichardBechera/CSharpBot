@@ -9,6 +9,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Mime;
 using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
@@ -128,7 +129,6 @@ namespace csharpbot.Commands
         public async Task Emotevote(CommandContext ctx, string old, string newemote, string name)
         {
             var webClient = new WebClient();
-            Stream imageBytes;
             /*try
             {
                 imageBytes = webClient.OpenRead(newemote);
@@ -139,7 +139,7 @@ namespace csharpbot.Commands
                 return;
             }*/
             var interaction = ctx.Client.GetInteractivityModule();
-            var time = new TimeSpan(0, 0, 0, 59);
+            /*var time = new TimeSpan(0, 0, 0, 59);
 
             var optionReactions = new[] {DiscordEmoji.FromName(ctx.Client, ":thumbsup:"), 
                 DiscordEmoji.FromName(ctx.Client, ":thumbsdown:")
@@ -164,14 +164,29 @@ namespace csharpbot.Commands
 
             var result = isMore && isRatio;
             await ctx.RespondAsync(result ? "The change will come" : "People disagreed");
-            //! delete and add doesn't work properly
-            var emoji = ctx.Guild.GetEmojisAsync().Result.First(a => a.GetDiscordName().Equals(old.Trim()));
-            await ctx.RespondAsync(emoji.GetDiscordName());
-            await ctx.Guild.DeleteEmojiAsync(emoji);
-            await ctx.RespondAsync(emoji.GetDiscordName());
+            //! dd doesn't work properly
+            var emoji = ctx.Guild.GetEmojisAsync().Result;
+            var emojiResult = emoji.First(a => a.ToString() == old);
+            await ctx.Guild.DeleteEmojiAsync(emojiResult);*/
+            var uri = new Uri(newemote);
+            await ctx.RespondAsync(GetFileSize(uri));
+            
             await ctx.Guild.CreateEmojiAsync(name, webClient.OpenRead(newemote));
-            await ctx.RespondAsync(emoji.Name);
+            //await ctx.RespondAsync(emoji.Name);
 
+        }
+        
+        private static string GetFileSize(Uri uriPath)
+        {
+            var webRequest = HttpWebRequest.Create(uriPath);
+            webRequest.Method = "HEAD";
+  
+            using (var webResponse = webRequest.GetResponse())
+            {
+                var fileSize = webResponse.Headers.Get("Content-Length");
+                var fileSizeInMegaByte = Math.Round(Convert.ToDouble(fileSize) / 1024.0 / 1024.0, 2);
+                return fileSizeInMegaByte + " MB";
+            }
         }
 
         [Command("memes_t")]
@@ -257,7 +272,20 @@ namespace csharpbot.Commands
             var jsonContent = stuff.ReadAsStringAsync().Result;
             dynamic url = JsonConvert.DeserializeObject(jsonContent);
             return url.data.url;
-        } 
-        
-    }
+        }
+
+        [Command("popit")]
+        [Description("Make popping message")]
+        public async Task Popit(CommandContext ctx, params string[] messsage)
+        {
+            var fullMessage = messsage
+                .Aggregate((s, s1) => s + " " + s1)
+                .Select(a => $"||{a}||")
+                .Aggregate((s, s1) => s + s1);
+            
+            await ctx.RespondAsync(fullMessage);
+            await ctx.Message.DeleteAsync("shouldnt be there");
+        }
+
+        }
 }
