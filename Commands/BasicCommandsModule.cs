@@ -10,6 +10,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Mime;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using DSharpPlus;
@@ -283,9 +284,123 @@ namespace csharpbot.Commands
                 .Select(a => $"||{a}||")
                 .Aggregate((s, s1) => s + s1);
             
-            await ctx.RespondAsync(fullMessage);
-            await ctx.Message.DeleteAsync("shouldnt be there");
+            ctx.RespondAsync(fullMessage);
+            ctx.Message.DeleteAsync("shouldnt be there");
         }
 
+        [Command("RateT")]
+        [Description("Leave your rating on a given T")]
+        public async Task Rate(CommandContext ctx, string sub, int rating, params string[] comment)
+        {
+            if (rating > 10 || rating < 0)
+            {
+                var message = await ctx.RespondAsync("Rating is supposed to be in an interval [0, 10]");
+                DeleteMessageAsync(ctx, message);
+                return;
+            }
+
+            if (comment.Aggregate(0, (r, s) => s.Count() + r) > 2500)
+            {
+                var message = await ctx.RespondAsync("Rating is supposed to be in an interval [0, 10]");
+                DeleteMessageAsync(ctx, message);
+                return;
+            }
+            //TODO try get sub from database
+            
+            //parse comment
+            //use private enum instead of pos and neg
+            bool neg = false;
+            bool pos = false;
+            List<string> negatives = new List<string>();
+            List<string> positives = new List<string>();
+            StringBuilder rComment = new StringBuilder();
+            StringBuilder temp = new StringBuilder();
+            foreach (var com in comment)
+            {
+                if (com.StartsWith('+'))
+                {
+                    AssignComment(negatives, positives, rComment, temp, pos, neg);
+                    pos = true;
+                    neg = false;
+                } else if (com.StartsWith('-'))
+                {
+                    AssignComment(negatives, positives, rComment, temp, pos, neg);
+                    pos = false;
+                    neg = true;
+                } else if (com.StartsWith('@'))
+                {
+                    AssignComment(negatives, positives, rComment, temp, pos, neg);
+                    pos = false;
+                    neg = false;
+                }
+                temp.Append($" {com.TrimStart('+', '-', '@')}");
+            }
+            AssignComment(negatives, positives, rComment, temp, pos, neg);
+            if (positives.Count > 10 || negatives.Count > 10)
+            {
+                var message = await ctx.RespondAsync("At max 10 negatives and 10 positives");
+                DeleteMessageAsync(ctx, message);
+                return;
+            }
+            //TODO check content
+            
+            //TODO send POST on website
+
+            var previewContent = new StringBuilder();
+            previewContent.Append(rComment);
+            previewContent.Append("\n\nPositives:\n");
+            foreach (var item in positives)
+            {
+                previewContent.Append($"\t* {item}\n");
+            }
+            previewContent.Append("\nNegatives:\n");
+            foreach (var item in negatives)
+            {
+                previewContent.Append($"\t* {item}\n");
+            }
+
+            var ratingString = new StringBuilder();
+            ratingString.Append("\nRating:");
+            for (var i = 0; i < 10; i++)
+                ratingString.Append(i < rating ? " :green_circle:" : " :red_circle:");
+
+            previewContent.Append(ratingString);
+            
+            var preview = new DiscordEmbedBuilder()
+            {
+                Color = DiscordColor.Azure,
+                Description = $"Rating of {sub}:\n{previewContent}",
+                Footer = new DiscordEmbedBuilder.EmbedFooter() {Text = "//site url"},
+                Timestamp = DateTimeOffset.Now,
+                Title = "Rating",
+                //ThumbnailUrl = "post url",
+                Url = "https://portal.azure.com/"
+            };
+
+            var m = preview.Build();
+
+            ctx.Channel.SendMessageAsync(embed: preview);
+
         }
+
+        private void DeleteMessageAsync(CommandContext ctx, DiscordMessage message)
+        {
+            Thread.Sleep(5000);
+            message.DeleteAsync();
+            ctx.Message.DeleteAsync();
+        }
+
+        private void AssignComment(List<string> neg, List<string> pos, StringBuilder rComment, StringBuilder item, bool p,
+            bool n)
+        {
+              if (p)
+                  pos.Add(item.ToString().Trim());
+              else if (n)
+                  neg.Add(item.ToString().Trim());
+              else
+                  rComment.Append($"\n{item.ToString().Trim()}");
+              item.Clear();
+        }
+
+    }
 }
